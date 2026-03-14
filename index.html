@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vietnamese Incense Timer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        incense: '#8B4513',
+                        smoke: 'rgba(200, 200, 200, 0.8)',
+                        bowl: '#CD853F'
+                    },
+                    animation: {
+                        'smoke-rise': 'smoke 3s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        smoke: {
+                            '0%': { opacity: 0, transform: 'translateY(0) scale(1)' },
+                            '10%': { opacity: 0.3 },
+                            '50%': { opacity: 0.2, transform: 'translateY(-20px) scale(1.1)' },
+                            '100%': { opacity: 0, transform: 'translateY(-40px) scale(1.2)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Dark mode detection */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                color-scheme: dark;
+            }
+        }
+
+        body {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .smoke-particle {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background-color: var(--smoke-color, rgba(220, 220, 220, 0.6));
+            border-radius: 50%;
+            filter: blur(4px);
+            animation: smoke 4s ease-out infinite;
+            transform-origin: center bottom;
+        }
+
+        .dark .smoke-particle {
+            --smoke-color: rgba(180, 180, 180, 0.4);
+        }
+        
+        @keyframes smoke {
+            0% { opacity: 0.1; transform: translateY(0) scale(0.8) rotate(0deg); }
+            20% { opacity: 0.3; }
+            50% { opacity: 0.2; transform: translateY(-30px) scale(1.2) rotate(5deg); }
+            80% { opacity: 0.1; transform: translateY(-60px) scale(1.4) rotate(10deg); }
+            100% { opacity: 0; transform: translateY(-80px) scale(1.6) rotate(15deg); }
+        }
+
+        .incense-stick {
+            transition: height 0.5s linear;
+            background: linear-gradient(to bottom, #a2611f, #8B4513, #6e370f);
+            position: relative;
+            z-index: 10;
+        }
+        
+        .incense-stick::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                linear-gradient(90deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0) 60%),
+                linear-gradient(rgba(0,0,0,0) 90%, rgba(0,0,0,0.1) 100%);
+            background-size: 10px 100%, 100% 20px;
+            z-index: 15;
+        }
+
+        .burning {
+            box-shadow: 0 0 12px 4px rgba(255, 100, 0, 0.5);
+            animation: ember-glow 1.5s infinite alternate;
+        }
+
+        @keyframes ember-glow {
+            0% { box-shadow: 0 0 8px 2px rgba(255, 100, 0, 0.4); background-color: #ff5500; }
+            100% { box-shadow: 0 0 14px 6px rgba(255, 60, 0, 0.6); background-color: #ff3c00; }
+        }
+
+        .bowl {
+            background: radial-gradient(circle at center, var(--bowl-color, #CD853F) 60%, var(--bowl-shadow, #A0522D) 100%);
+            box-shadow: inset 0 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+            z-index: 5;
+        }
+        
+        .bowl::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: 8px;
+            right: 8px;
+            height: 10px;
+            background-color: rgba(120, 70, 40, 0.8);
+            border-radius: 50%;
+            z-index: -1;
+        }
+
+        .dark .bowl {
+            --bowl-color: #8B4513;
+            --bowl-shadow: #5e2f0d;
+        }
+
+        /* Loop toggle styles */
+        .loop-toggle {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .loop-toggle.active {
+            background-color: #5D5CDE !important;
+        }
+
+        .loop-toggle-switch {
+            transition: transform 0.3s ease;
+        }
+
+        .loop-toggle.active .loop-toggle-switch {
+            transform: translateX(1.25rem);
+        }
+
+        /* Yin Yang styles */
+        .yin-yang-container {
+            --yin-yang-black: #0d0d0d;
+            --yin-yang-white: #f7f0d4;
+            --yin-yang-border: #2a2a2a;
+            --yin-yang-glow: #555555;
+        }
+
+        .dark .yin-yang-container {
+            --yin-yang-black: #1a1a1a;
+            --yin-yang-white: #f2e8c4;
+            --yin-yang-border: #444444;
+            --yin-yang-glow: #666666;
+        }
+
+        .yin-yang-svg {
+            animation: yin-yang-rotate 20s linear infinite;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+        }
+
+        @keyframes yin-yang-rotate {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-300">
+    <!-- App Container -->
+    <div class="container mx-auto max-w-md flex flex-col items-center">
+        <h1 class="text-2xl md:text-3xl font-bold text-center mb-4">Vietnamese Incense Timer</h1>
+        
+        <!-- Time Selection -->
+        <div class="w-full mb-6">
+            <h2 class="text-lg font-semibold mb-2 text-center">Select Timer Duration:</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                <button data-time="30" class="time-btn px-2 py-2 rounded-lg border-2 border-gray-300 hover:border-primary dark:border-gray-600 dark:hover:border-primary text-sm md:text-base">30 sec</button>
+                <button data-time="60" class="time-btn px-2 py-2 rounded-lg border-2 border-gray-300 hover:border-primary dark:border-gray-600 dark:hover:border-primary text-sm md:text-base">1 min</button>
+                <button data-time="120" class="time-btn px-2 py-2 rounded-lg border-2 border-gray-300 hover:border-primary dark:border-gray-600 dark:hover:border-primary text-sm md:text-base">2 min</button>
+                <button data-time="300" class="time-btn px-2 py-2 rounded-lg border-2 border-gray-300 hover:border-primary dark:border-gray-600 dark:hover:border-primary text-sm md:text-base">5 min</button>
+                <button data-time="600" class="time-btn px-2 py-2 rounded-lg border-2 border-gray-300 hover:border-primary dark:border-gray-600 dark:hover:border-primary text-sm md:text-base">10 min</button>
+                <button data-time="1800" class="time-btn px-2 py-2 rounded-lg border-2 border-gray-300 hover:border-primary dark:border-gray-600 dark:hover:border-primary text-sm md:text-base">30 min</button>
+                <button data-time="3600" class="time-btn px-2 py-2 rounded-lg border-2 border-gray-300 hover:border-primary dark:border-gray-600 dark:hover:border-primary text-sm md:text-base">1 hour</button>
+                <button data-time="5400" class="time-btn px-2 py-2 rounded-lg border-2 border-gray-300 hover:border-primary dark:border-gray-600 dark:hover:border-primary text-sm md:text-base">1.5 hours</button>
+                <button data-time="7200" class="time-btn px-2 py-2 rounded-lg border-2 border-gray-300 hover:border-primary dark:border-gray-600 dark:hover:border-primary text-sm md:text-base">2 hours</button>
+                <button data-time="10800" class="time-btn px-2 py-2 rounded-lg border-2 border-gray-300 hover:border-primary dark:border-gray-600 dark:hover:border-primary text-sm md:text-base">3 hours</button>
+            </div>
+            
+            <!-- Custom Time Input -->
+            <div class="mt-4 border-t pt-3 dark:border-gray-700">
+                <h3 class="text-base font-medium mb-2 text-center">Custom Time:</h3>
+                <div class="flex items-center justify-center gap-2">
+                    <div class="flex flex-col">
+                        <label for="custom-hours" class="text-xs text-gray-600 dark:text-gray-400">Hours</label>
+                        <input type="number" id="custom-hours" min="0" max="3" class="w-20 px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded-lg text-base" value="0">
+                    </div>
+                    <div class="flex flex-col">
+                        <label for="custom-minutes" class="text-xs text-gray-600 dark:text-gray-400">Minutes</label>
+                        <input type="number" id="custom-minutes" min="0" max="59" class="w-20 px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded-lg text-base" value="0">
+                    </div>
+                    <div class="flex flex-col">
+                        <label for="custom-seconds" class="text-xs text-gray-600 dark:text-gray-400">Seconds</label>
+                        <input type="number" id="custom-seconds" min="0" max="59" class="w-20 px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded-lg text-base" value="0">
+                    </div>
+                    <button id="set-custom-time" class="mt-4 px-3 py-1 rounded-lg bg-primary text-white hover:bg-opacity-90 text-base">Set</button>
+                </div>
+                <p id="custom-time-error" class="text-red-500 text-xs mt-1 text-center hidden">Please enter a valid time (1 second to 3 hours)</p>
+            </div>
+        </div>
+
+        <!-- Incense Bowl & Stick Container -->
+        <div class="relative w-full h-[450px] flex flex-col items-center justify-end mb-4">
+            <!-- Timer Display -->
+            <div id="timer-display" class="absolute top-0 left-0 right-0 text-center text-xl md:text-2xl font-semibold">
+                Select a time
+            </div>
+            
+            <!-- Yin Yang Background -->
+            <div class="absolute w-full h-full overflow-hidden opacity-15 dark:opacity-25 pointer-events-none">
+                <div class="absolute w-48 h-48 top-8 left-1/2 -translate-x-1/2 yin-yang-container">
+                    <svg class="w-full h-full yin-yang-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Outer circle -->
+                        <circle cx="100" cy="100" r="98" fill="var(--yin-yang-black)" stroke="var(--yin-yang-border)" stroke-width="2"/>
+                        
+                        <!-- White half -->
+                        <path d="M 100 2 A 98 98 0 0 1 100 198 A 49 49 0 0 1 100 100 A 49 49 0 0 0 100 2 Z" fill="var(--yin-yang-white)"/>
+                        
+                        <!-- Small white dot on white side (top) -->
+                        <circle cx="100" cy="50" r="12" fill="var(--yin-yang-white)" stroke="var(--yin-yang-white)" stroke-width="1"/>
+                        
+                        <!-- Small black dot on black side (bottom) -->
+                        <circle cx="100" cy="150" r="12" fill="var(--yin-yang-black)" stroke="var(--yin-yang-black)" stroke-width="1"/>
+                        
+                        <!-- Subtle inner glow effect -->
+                        <circle cx="100" cy="100" r="95" fill="none" stroke="var(--yin-yang-glow)" stroke-width="1" opacity="0.3"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Smoke Particles Container -->
+            <div id="smoke-container" class="absolute bottom-32 left-1/2 transform -translate-x-1/2 w-8 h-40">
+                <!-- Smoke particles will be added by JS -->
+            </div>
+            
+            <!-- Incense Stick -->
+            <div class="relative mb-3">
+                <div id="incense-stick" class="incense-stick w-2 h-80 bg-incense rounded-t-md mx-auto"></div>
+                <div id="burning-tip" class="hidden absolute w-4 h-4 rounded-full bg-red-500 top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 burning"></div>
+            </div>
+            
+            <!-- Zen Incense Burner -->
+            <div class="zen-incense-burner w-36 h-18 mx-auto relative">
+                <svg class="w-full h-full" viewBox="0 0 144 72" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Main round burner body -->
+                    <circle cx="72" cy="56" r="68" fill="url(#burnerGradient)" stroke="url(#burnerBorder)" stroke-width="1"/>
+                    
+                    <!-- Inner bowl -->
+                    <circle cx="72" cy="54" r="52" fill="url(#innerBowl)" stroke="rgba(101, 67, 33, 0.4)" stroke-width="0.5"/>
+                    
+                    <!-- Mountain and Sun Scene in Ash Base -->
+                    <g opacity="0.95">
+                        <!-- Main scene circle (ash base size) -->
+                        <circle cx="72" cy="55" r="38" fill="url(#sceneBg)" stroke="url(#frameGradient)" stroke-width="1"/>
+                        
+                        <!-- Red/orange sun -->
+                        <circle cx="72" cy="35" r="8" fill="url(#sunGradient)"/>
+                        
+                        <!-- Back mountain (lighter) -->
+                        <path d="M 40 75 L 50 45 L 62 55 L 72 50 L 82 55 L 94 45 L 104 75 Z" fill="url(#backMountain)" opacity="0.7"/>
+                        
+                        <!-- Front mountain (darker) -->
+                        <path d="M 34 75 L 45 55 L 58 65 L 72 58 L 86 65 L 99 55 L 110 75 Z" fill="url(#frontMountain)" opacity="0.8"/>
+                        
+                        <!-- Mist/clouds effect -->
+                        <ellipse cx="60" cy="65" rx="15" ry="5" fill="url(#mistGradient)" opacity="0.4"/>
+                        <ellipse cx="84" cy="68" rx="12" ry="4" fill="url(#mistGradient)" opacity="0.3"/>
+                    </g>
+                    
+                    <!-- Simple elegant rim -->
+                    <circle cx="72" cy="56" r="68" fill="none" stroke="url(#rimGradient)" stroke-width="1.5"/>
+                    
+                    <!-- Three leg supports -->
+                    <ellipse cx="72" cy="72" rx="6" ry="2" fill="url(#handleGradient)" opacity="0.9"/>
+                    <ellipse cx="42" cy="68" rx="5" ry="2" fill="url(#handleGradient)" opacity="0.8"/>
+                    <ellipse cx="102" cy="68" rx="5" ry="2" fill="url(#handleGradient)" opacity="0.8"/>
+                    
+                    <!-- Gradient Definitions -->
+                    <defs>
+                        <radialGradient id="burnerGradient" cx="50%" cy="25%" r="85%">
+                            <stop offset="0%" style="stop-color:#D4AF37;stop-opacity:1" />
+                            <stop offset="30%" style="stop-color:#B8860B;stop-opacity:1" />
+                            <stop offset="70%" style="stop-color:#8B7355;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#654321;stop-opacity:1" />
+                        </radialGradient>
+                        
+                        <radialGradient id="innerBowl" cx="50%" cy="20%" r="75%">
+                            <stop offset="0%" style="stop-color:#8B7355;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#5D4E37;stop-opacity:1" />
+                        </radialGradient>
+                        
+                        <radialGradient id="ashGradient" cx="50%" cy="25%" r="65%">
+                            <stop offset="0%" style="stop-color:#F5F5DC;stop-opacity:0.9" />
+                            <stop offset="60%" style="stop-color:#DDD3C0;stop-opacity:0.95" />
+                            <stop offset="100%" style="stop-color:#D2B48C;stop-opacity:1" />
+                        </radialGradient>
+                        
+                        <linearGradient id="rimGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#8B7355;stop-opacity:0.8" />
+                            <stop offset="50%" style="stop-color:#A0522D;stop-opacity:0.9" />
+                            <stop offset="100%" style="stop-color:#8B7355;stop-opacity:0.8" />
+                        </linearGradient>
+                        
+                        <linearGradient id="zenTextGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:#2F4F4F;stop-opacity:1" />
+                            <stop offset="30%" style="stop-color:#696969;stop-opacity:1" />
+                            <stop offset="70%" style="stop-color:#556B2F;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#2F4F4F;stop-opacity:1" />
+                        </linearGradient>
+                        
+                        <radialGradient id="handleGradient" cx="50%" cy="15%" r="85%">
+                            <stop offset="0%" style="stop-color:#B8860B;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#654321;stop-opacity:1" />
+                        </radialGradient>
+                        
+                        <linearGradient id="burnerBorder" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:#8B7355;stop-opacity:0.9" />
+                            <stop offset="100%" style="stop-color:#5D4E37;stop-opacity:1" />
+                        </linearGradient>
+                        
+                        <!-- Mountain Scene Gradients -->
+                        <radialGradient id="sceneBg" cx="50%" cy="60%" r="80%">
+                            <stop offset="0%" style="stop-color:#F0F8FF;stop-opacity:1" />
+                            <stop offset="80%" style="stop-color:#E6F3FF;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#D0E7FF;stop-opacity:1" />
+                        </radialGradient>
+                        
+                        <linearGradient id="frameGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:#8B7355;stop-opacity:0.9" />
+                            <stop offset="100%" style="stop-color:#5D4E37;stop-opacity:1" />
+                        </linearGradient>
+                        
+                        <radialGradient id="sunGradient" cx="30%" cy="30%" r="80%">
+                            <stop offset="0%" style="stop-color:#FF6B35;stop-opacity:1" />
+                            <stop offset="70%" style="stop-color:#DC143C;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#B22222;stop-opacity:1" />
+                        </radialGradient>
+                        
+                        <linearGradient id="backMountain" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:#B0C4DE;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#8B9DC3;stop-opacity:1" />
+                        </linearGradient>
+                        
+                        <linearGradient id="frontMountain" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:#708090;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#556B2F;stop-opacity:1" />
+                        </linearGradient>
+                        
+                        <radialGradient id="mistGradient" cx="50%" cy="50%" r="70%">
+                            <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:0.8" />
+                            <stop offset="100%" style="stop-color:#F5F5F5;stop-opacity:0.3" />
+                        </radialGradient>
+                    </defs>
+                </svg>
+                
+                <!-- Incense stick hole -->
+                <div class="absolute w-2 h-1 bg-black bg-opacity-40 rounded-full top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 mt-1"></div>
+            </div>
+        </div>
+
+        <!-- Loop Toggle Section -->
+        <div class="w-full flex justify-center mb-4">
+            <div class="flex items-center gap-3 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <span class="text-sm font-medium">Loop Timer:</span>
+                <button id="loop-toggle" class="loop-toggle relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50 bg-gray-300 dark:bg-gray-600">
+                    <span id="loop-toggle-switch" class="loop-toggle-switch inline-block h-4 w-4 transform rounded-full bg-white translate-x-1"></span>
+                </button>
+                <span id="loop-status" class="text-sm font-medium text-gray-600 dark:text-gray-400">OFF</span>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex gap-3 w-full justify-center mb-4">
+            <button id="start-btn" class="px-5 py-2 rounded-lg bg-primary text-white hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50 disabled:bg-gray-400 disabled:cursor-not-allowed text-base">
+                Start
+            </button>
+            <button id="pause-btn" class="hidden px-5 py-2 rounded-lg bg-yellow-500 text-white hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50 text-base">
+                Pause
+            </button>
+            <button id="reset-btn" class="hidden px-5 py-2 rounded-lg bg-red-500 text-white hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 text-base">
+                Reset
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Dark mode detection
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        // DOM Elements
+        const timeButtons = document.querySelectorAll('.time-btn');
+        const startBtn = document.getElementById('start-btn');
+        const pauseBtn = document.getElementById('pause-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const timerDisplay = document.getElementById('timer-display');
+        const incenseStick = document.getElementById('incense-stick');
+        const burningTip = document.getElementById('burning-tip');
+        const smokeContainer = document.getElementById('smoke-container');
+        const customHours = document.getElementById('custom-hours');
+        const customMinutes = document.getElementById('custom-minutes');
+        const customSeconds = document.getElementById('custom-seconds');
+        const setCustomTimeBtn = document.getElementById('set-custom-time');
+        const customTimeError = document.getElementById('custom-time-error');
+        const loopToggle = document.getElementById('loop-toggle');
+        const loopToggleSwitch = document.getElementById('loop-toggle-switch');
+        const loopStatus = document.getElementById('loop-status');
+
+        // Audio Context
+        let audioContext;
+        
+        // Timer variables
+        let selectedTime = 0;
+        let remainingTime = 0;
+        let timerInterval = null;
+        let originalStickHeight = 320; // Height in px for our longer stick
+        let isRunning = false;
+        let isPaused = false;
+        let smokeInterval = null;
+        let isLoopEnabled = false;
+
+        // Initialize timer buttons
+        timeButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Remove active class from all buttons
+                timeButtons.forEach(b => b.classList.remove('bg-primary', 'text-white'));
+                
+                // Add active class to clicked button
+                btn.classList.add('bg-primary', 'text-white');
+                
+                // Set the selected time
+                selectedTime = parseInt(btn.dataset.time);
+                remainingTime = selectedTime;
+                
+                // Update timer display
+                updateTimerDisplay();
+                
+                // Enable start button
+                startBtn.disabled = false;
+                
+                // Hide any custom time error
+                customTimeError.classList.add('hidden');
+            });
+        });
+        
+        // Loop toggle handler
+        loopToggle.addEventListener('click', () => {
+            isLoopEnabled = !isLoopEnabled;
+            console.log('Loop toggled:', isLoopEnabled); // Debug log
+            
+            // Update toggle visual state
+            if (isLoopEnabled) {
+                loopToggle.classList.add('active');
+                loopStatus.textContent = 'ON';
+                loopStatus.classList.remove('text-gray-600', 'dark:text-gray-400');
+                loopStatus.classList.add('text-primary', 'font-bold');
+            } else {
+                loopToggle.classList.remove('active');
+                loopStatus.textContent = 'OFF';
+                loopStatus.classList.remove('text-primary', 'font-bold');
+                loopStatus.classList.add('text-gray-600', 'dark:text-gray-400');
+            }
+        });
+
+        // Custom time button handler
+        setCustomTimeBtn.addEventListener('click', () => {
+            // Get hours, minutes and seconds values
+            const hours = parseInt(customHours.value) || 0;
+            const minutes = parseInt(customMinutes.value) || 0;
+            const seconds = parseInt(customSeconds.value) || 0;
+            
+            // Calculate total seconds
+            const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+            
+            // Validate the input (must be at least 1 second and not more than 3 hours)
+            if (totalSeconds < 1 || totalSeconds > 10800) {
+                customTimeError.classList.remove('hidden');
+                return;
+            }
+            
+            // Hide any error message
+            customTimeError.classList.add('hidden');
+            
+            // Remove active class from all preset buttons
+            timeButtons.forEach(btn => btn.classList.remove('bg-primary', 'text-white'));
+            
+            // Set the custom time
+            selectedTime = totalSeconds;
+            remainingTime = totalSeconds;
+            
+            // Update timer display
+            updateTimerDisplay();
+            
+            // Enable start button
+            startBtn.disabled = false;
+        });
+
+        // Start button
+        startBtn.addEventListener('click', () => {
+            if (selectedTime === 0) return;
+            
+            // Initialize audio context on first user interaction
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            // Show pause and reset buttons
+            startBtn.classList.add('hidden');
+            pauseBtn.classList.remove('hidden');
+            resetBtn.classList.remove('hidden');
+            
+            // Disable time selection and custom time inputs
+            timeButtons.forEach(btn => btn.disabled = true);
+            customHours.disabled = true;
+            customMinutes.disabled = true;
+            customSeconds.disabled = true;
+            setCustomTimeBtn.disabled = true;
+            
+            // If timer was paused, resume it
+            if (isPaused) {
+                isPaused = false;
+                isRunning = true;
+            } else {
+                // Start new timer
+                remainingTime = selectedTime;
+                isRunning = true;
+                
+                // Reset stick height
+                incenseStick.style.height = `${originalStickHeight}px`;
+            }
+            
+            // Show burning tip
+            burningTip.classList.remove('hidden');
+            
+            // Start timer
+            startTimer();
+            
+            // Start smoke animation
+            startSmokeAnimation();
+        });
+
+        // Pause button
+        pauseBtn.addEventListener('click', () => {
+            if (!isRunning) return;
+            
+            // Pause timer
+            clearInterval(timerInterval);
+            clearInterval(smokeInterval);
+            
+            // Update state
+            isPaused = true;
+            isRunning = false;
+            
+            // Update buttons
+            pauseBtn.classList.add('hidden');
+            startBtn.classList.remove('hidden');
+            startBtn.textContent = 'Resume';
+        });
+
+        // Reset button
+        resetBtn.addEventListener('click', () => {
+            // Reset timer
+            clearInterval(timerInterval);
+            clearInterval(smokeInterval);
+            
+            // Clean up smoke particles
+            smokeContainer.innerHTML = '';
+            
+            // Reset state
+            isRunning = false;
+            isPaused = false;
+            remainingTime = 0;
+            selectedTime = 0;
+            
+            // Reset UI
+            timerDisplay.textContent = 'Select a time';
+            incenseStick.style.height = `${originalStickHeight}px`;
+            burningTip.classList.add('hidden');
+            
+            // Reset buttons
+            timeButtons.forEach(btn => {
+                btn.disabled = false;
+                btn.classList.remove('bg-primary', 'text-white');
+            });
+            startBtn.classList.remove('hidden');
+            startBtn.textContent = 'Start';
+            startBtn.disabled = true;
+            pauseBtn.classList.add('hidden');
+            resetBtn.classList.add('hidden');
+            
+            // Reset custom time inputs
+            customHours.disabled = false;
+            customMinutes.disabled = false;
+            customSeconds.disabled = false;
+            setCustomTimeBtn.disabled = false;
+            customHours.value = 0;
+            customMinutes.value = 0;
+            customSeconds.value = 0;
+            customTimeError.classList.add('hidden');
+        });
+
+        // Timer function
+        function startTimer() {
+            // Clear any existing interval
+            if (timerInterval) clearInterval(timerInterval);
+            
+            const startTime = Date.now();
+            const initialRemainingTime = remainingTime;
+            
+            timerInterval = setInterval(() => {
+                // Calculate elapsed time
+                const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+                remainingTime = initialRemainingTime - elapsedSeconds;
+                
+                if (remainingTime <= 0) {
+                    // Timer complete
+                    endTimer();
+                } else {
+                    // Update timer display
+                    updateTimerDisplay();
+                    
+                    // Update incense stick height
+                    const percentComplete = 1 - (remainingTime / selectedTime);
+                    const newHeight = originalStickHeight * (1 - percentComplete);
+                    incenseStick.style.height = `${newHeight}px`;
+                    
+                    // Update burning tip position
+                    burningTip.style.top = `-2px`;
+                }
+            }, 1000);
+        }
+
+        // End timer function
+        function endTimer() {
+            console.log('Timer ended, loop enabled:', isLoopEnabled); // Debug log
+            
+            // Clear intervals
+            clearInterval(timerInterval);
+            clearInterval(smokeInterval);
+            
+            // Reset state
+            isRunning = false;
+            remainingTime = 0;
+            
+            // Update UI
+            updateTimerDisplay();
+            incenseStick.style.height = '0px';
+            burningTip.classList.add('hidden');
+            
+            // Play sound
+            playBoongSound();
+            
+            // Show message
+            timerDisplay.textContent = 'Time is up!';
+            
+            // Check if loop is enabled
+            if (isLoopEnabled && selectedTime > 0) {
+                console.log('Starting loop in 3 seconds...'); // Debug log
+                // Wait for the bell sound to play (3 seconds) then restart automatically
+                setTimeout(() => {
+                    console.log('Restarting timer due to loop'); // Debug log
+                    
+                    // Reset for next loop
+                    remainingTime = selectedTime;
+                    isRunning = true;
+                    
+                    // Reset incense stick height
+                    incenseStick.style.height = `${originalStickHeight}px`;
+                    
+                    // Show burning tip
+                    burningTip.classList.remove('hidden');
+                    
+                    // Clear smoke particles
+                    smokeContainer.innerHTML = '';
+                    
+                    // Start timer again
+                    startTimer();
+                    
+                    // Start smoke animation again
+                    startSmokeAnimation();
+                }, 3000);
+            } else {
+                // Normal end behavior when loop is disabled
+                // Reset buttons
+                startBtn.classList.remove('hidden');
+                startBtn.textContent = 'Start Again';
+                startBtn.disabled = true;
+                pauseBtn.classList.add('hidden');
+                
+                // Enable time selection and custom time inputs
+                timeButtons.forEach(btn => btn.disabled = false);
+                customHours.disabled = false;
+                customMinutes.disabled = false;
+                customSeconds.disabled = false;
+                setCustomTimeBtn.disabled = false;
+            }
+        }
+
+        // Update timer display
+        function updateTimerDisplay() {
+            const minutes = Math.floor(remainingTime / 60);
+            const seconds = remainingTime % 60;
+            timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // Smoke animation
+        function startSmokeAnimation() {
+            // Clear any existing interval
+            if (smokeInterval) clearInterval(smokeInterval);
+            
+            // Add initial smoke particles
+            addSmokeParticle();
+            
+            // Add new particles periodically
+            smokeInterval = setInterval(() => {
+                if (isRunning) {
+                    addSmokeParticle();
+                }
+            }, 300);
+        }
+
+        // Add a smoke particle
+        function addSmokeParticle() {
+            const particle = document.createElement('div');
+            particle.classList.add('smoke-particle');
+            
+            // Random position near the center
+            const xOffset = (Math.random() - 0.5) * 6;
+            particle.style.left = `calc(50% + ${xOffset}px)`;
+            particle.style.bottom = '100%';
+            
+            // Random animation duration and delay
+            const duration = 2 + Math.random() * 2;
+            const delay = Math.random() * 0.5;
+            particle.style.animationDuration = `${duration}s`;
+            particle.style.animationDelay = `${delay}s`;
+            
+            // Add to container and remove after animation
+            smokeContainer.appendChild(particle);
+            setTimeout(() => {
+                if (particle.parentNode === smokeContainer) {
+                    smokeContainer.removeChild(particle);
+                }
+            }, (duration + delay) * 1000);
+        }
+
+        // Play the Buddhist temple bell sound (boong)
+        function playBoongSound() {
+            if (!audioContext) return;
+            
+            // Create reverb effect
+            const convolver = audioContext.createConvolver();
+            const reverbGain = audioContext.createGain();
+            reverbGain.gain.value = 0.3;
+            
+            // Create main bell sound oscillators
+            const mainFrequency = 90; // Deep temple bell fundamental frequency
+            
+            // Primary bell tone
+            const osc1 = audioContext.createOscillator();
+            const gain1 = audioContext.createGain();
+            osc1.frequency.value = mainFrequency;
+            osc1.type = 'sine';
+            
+            // Harmonic overtones typical of Asian temple bells
+            const osc2 = audioContext.createOscillator();
+            const gain2 = audioContext.createGain();
+            osc2.frequency.value = mainFrequency * 2.1; // Slightly detuned octave
+            osc2.type = 'sine';
+            
+            const osc3 = audioContext.createOscillator();
+            const gain3 = audioContext.createGain();
+            osc3.frequency.value = mainFrequency * 3.32; // Third harmonic with detuning
+            osc3.type = 'sine';
+            
+            const osc4 = audioContext.createOscillator();
+            const gain4 = audioContext.createGain();
+            osc4.frequency.value = mainFrequency * 4.76; // Higher harmonic
+            osc4.type = 'sine';
+            
+            // Fifth harmonic - gives the distinctive buddhist bell character
+            const osc5 = audioContext.createOscillator();
+            const gain5 = audioContext.createGain();
+            osc5.frequency.value = mainFrequency * 5.65;
+            osc5.type = 'sine';
+            
+            // Master gain
+            const masterGain = audioContext.createGain();
+            masterGain.gain.value = 0.7;
+            
+            // Connect oscillators to gains
+            osc1.connect(gain1);
+            osc2.connect(gain2);
+            osc3.connect(gain3);
+            osc4.connect(gain4);
+            osc5.connect(gain5);
+            
+            // Connect gains to master
+            gain1.connect(masterGain);
+            gain2.connect(masterGain);
+            gain3.connect(masterGain);
+            gain4.connect(masterGain);
+            gain5.connect(masterGain);
+            
+            // Connect master to output
+            masterGain.connect(audioContext.destination);
+            
+            // Set envelopes - temple bells have a sharp attack and very long decay
+            const now = audioContext.currentTime;
+            
+            // Main tone has longest sustain
+            gain1.gain.setValueAtTime(0, now);
+            gain1.gain.linearRampToValueAtTime(0.6, now + 0.01);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 8.0);
+            
+            // Second harmonic
+            gain2.gain.setValueAtTime(0, now);
+            gain2.gain.linearRampToValueAtTime(0.3, now + 0.02);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 6.0);
+            
+            // Third harmonic
+            gain3.gain.setValueAtTime(0, now);
+            gain3.gain.linearRampToValueAtTime(0.15, now + 0.03);
+            gain3.gain.exponentialRampToValueAtTime(0.001, now + 5.0);
+            
+            // Fourth harmonic
+            gain4.gain.setValueAtTime(0, now);
+            gain4.gain.linearRampToValueAtTime(0.1, now + 0.04);
+            gain4.gain.exponentialRampToValueAtTime(0.001, now + 4.0);
+            
+            // Fifth harmonic
+            gain5.gain.setValueAtTime(0, now);
+            gain5.gain.linearRampToValueAtTime(0.05, now + 0.05);
+            gain5.gain.exponentialRampToValueAtTime(0.001, now + 3.0);
+            
+            // Start and stop oscillators
+            osc1.start(now);
+            osc2.start(now);
+            osc3.start(now);
+            osc4.start(now);
+            osc5.start(now);
+            
+            osc1.stop(now + 8.0);
+            osc2.stop(now + 6.0);
+            osc3.stop(now + 5.0);
+            osc4.stop(now + 4.0);
+            osc5.stop(now + 3.0);
+            
+            // Add subtle vibrato for realistic bell wobble
+            const lfo = audioContext.createOscillator();
+            const lfoGain = audioContext.createGain();
+            lfo.frequency.value = 2.5;
+            lfoGain.gain.value = 1.5;
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc1.frequency);
+            lfo.start();
+            lfo.stop(now + 8.0);
+        }
+
+        // Initialize the app
+        function init() {
+            // Disable start button initially
+            startBtn.disabled = true;
+        }
+
+        // Start the app
+        init();
+    </script>
+</body>
+</html>
